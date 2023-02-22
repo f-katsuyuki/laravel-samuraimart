@@ -242,55 +242,749 @@ php artisan migrate::fresh //テーブルを削除
 ◆◆◆再度カテゴリデータを作成しなおす
 【コマンド】
 php artisan db:seed --class=CategoriesTableSeeder　　　　　//-----------------migrationをやり直すのにmigrateがない？？？
+-------------------------------------------------------------------------------------------
+●5商品を追加できるようにしよう
+-------------------------------------------------------------------------------------------
+----------------------------------------
+◆5.1商品のモデルを追加
+----------------------------------------
+【コマンド】
+php artisan make:model Product -m
+----------------------------------------------------------
+database
+　　L　migrations
+　　　　　　L　XXXX_XX_XX_XXXXXX_create_products_table.php
+-----------------------------------------------------------
+
+◆上記ファイルに定義追加
+			public function up()
+    		{
+				$table->string('name');
+            	$table->text('description');
+            	$table->integer('price')->unsigned();//unsigned()を追加することで、-5000などのマイナスの値が保存できない				$table->integer('category_id')->unsigned();
+			}
+			
+
+----------------------------------------
+◆5.2商品のコントローラーを追加
+----------------------------------------
+【コマンド】
+php artisan make:controller ProductController --resource --model=Product
+
+
+----------------------------------------
+◆5.2商品のコントローラーと紐づけを作成
+----------------------------------------
+app
+　L　Models
+　　　　L　Product.php
+　　★★　　
+　　public function category()
+     {
+         return $this->belongsTo('App\Models\Category');//モデルからCategoryを呼び出す設定をしている
+     }　　
+--------------------------------------------------------------------------
+
+●category.phpも同様にリレーション設定を行う
+	 public function products()
+     {
+         return $this->hasMany('App\Models\Product');//今回は紐づけというよりモデルからProductを呼び出せるようにしている
+     }
+※１つのカテゴリには複数の商品が結びつくのでhasmany
+
+----------------------------------------
+◆5.3 マイグレーションを実行
+----------------------------------------
+【コマンド】
+php artisan migrate
+
+
+----------------------------------------
+◆5.4 商品のCRUDを作成
+----------------------------------------
+----------------------------------------
+◆5.4.1商品のCRUD用のルーティング設定を行う
+----------------------------------------
+routes
+　　L　　routes\web.php
+　　
+　　Route::resource('products', ProductController::class);//productsControllerを使用を定義
+　　※【第一引数にベースとなるURLを文字列で渡し、第二引数で使用するコントローラを指定】
+　　
+　　
+----------------------------------------
+◆5.4.2コントローラーの設定を行う
+----------------------------------------　
+app
+　L　Http
+　　　L　Controllers
+　　　　　　　　L　ProductController.php
+
+　【◆index】
+	　	public function index()
+	    {
+	        $products=Product::all();//productsの全てを取得
+	        return view('products.index',compact('products'));//
+	    }
+	※'products.index'と記述すると、resources\views\productsディレクトリの中にあるindex.blade.phpが呼び出されます
+
+------------------------------------------	
+◆viewの作成
+-----------------------------------------
+resources
+     L views
+          L ●●●.blade.php　ファイルを作成する
+				
+			【view】
+			<a href="{{ route('products.create') }}"> Create New Product</a>
+ 
+			 <table>
+			     <tr>
+			         <th>Name</th>
+			         <th>Description</th>
+			         <th>Price</th>
+			         <th>Category ID</th>
+			         <th >Action</th>
+			     </tr>
+			     @foreach ($products as $product)
+			     <tr>
+			         <!--◆◆◆BladeではPHPのコードを{{と}}で囲むことで変数の中身をそのまま表示◆◆◆-->
+			         <td>{{ $product->name }}</td>
+			         <td>{{ $product->description }}</td>
+			         <td>{{ $product->price }}</td>
+			         <td>{{ $product->category_id }}</td>
+			         <td>
+			             <form action="{{ route('products.destroy',$product->id) }}" method="POST">
+			                <a href="{{ route('products.show',$product->id) }}">Show</a>
+			                <a href="{{ route('products.edit',$product->id) }}">Edit</a>
+			                 @csrf
+			                 @method('DELETE')
+			                 <button type="submit">Delete</button>
+			             </form>
+			         </td>
+			     </tr>
+			     @endforeach
+			 </table>	
+--------------------------------------------------------------------------------------------------------	
+
+	【◆createコントローラーの設定】
+		public function create()
+	    {
+	         return view('products.create');
+	    }
+	【◆◆viewの作成】
+	resources
+	　　　L　views
+	　　　　　　L　products
+	　　　　　　　　　　L　create.blade.php
+						-------------------------------------------------------------------------------------------
+						<div>
+     						<h2>Add New Product</h2>
+						 </div>
+						 <div>
+						     <a href="{{ route('products.index') }}"> Back</a>
+						 </div>
+						 
+						 <form action="{{ route('products.store') }}" method="POST">
+						     @csrf
+						 
+						     <div>
+						         <strong>Name:</strong>
+						         <input type="text" name="name" placeholder="Name">
+						     </div>
+						     <div>
+						         <strong>Description:</strong>
+						         <textarea style="height:150px" name="description" placeholder="Description"></textarea>
+						     </div>
+						     <div>
+						         <strong>Price:</strong>
+						         <input type="number" name="price" placeholder="Price">
+						     </div>
+						     <div>
+						         <button type="submit">Submit</button>
+						     </div>
+						 
+						 </form>
+
+				-------------------------------------------------------------------------------------------
+
+				【★★storeアクション】
+				-------------------------------------------------------------------------------------------
+					public function store(Request $request)
+				    {
+				        $product = new Product();
+				         $product->name = $request->input('name');
+				         $product->description = $request->input('description');
+				         $product->price = $request->input('price');
+				         $product->save();
+				 
+				         return to_route('products.index');
+				    }	
+				    ※return to_route('products.index’);ではデータが保存された後
+				    ※リダイレクト（別のページに移動すること）を行っています。
+				-------------------------------------------------------------------------------------------	
+				
+				-------------------------------------------------------------------------------------------	
+				【★★showアクション】
+				-------------------------------------------------------------------------------------------	
+					public function show(Product $product)
+				    {
+				        return view('products.show', compact('product'));
+				    }
+			　　  -------------------------------------------------------------------------------------------	
+			【★★showViewの作成】
+			resources
+			　　L　views
+			　　　　　L　products
+			　　　　　　　　　L　show.blade.php
+						-------------------------------------------------------------------------------------------
+						<div>
+						     <h2> Show Product</h2>
+						 </div>
+						 <div>
+						     <a href="{{ route('products.index') }}"> Back</a>
+						 </div>
+						 
+						 <div>
+						     <strong>Name:</strong>
+						     {{$product->name}}
+						 </div>
+						 
+						 <div>
+						     <strong>Description:</strong>
+						     {{$product->description}}
+						 </div>
+						 
+						 <div>
+						     <strong>Price:</strong>
+						     {{$product->price}} 
+						 </div>
+						 
+						 -------------------------------------------------------------------------------------------
+				-------------------------------------------------------------------------------------------	
+				【★★editアクション】
+				-------------------------------------------------------------------------------------------	
+				public function edit(Product $product)
+			    {
+			        return view('products.edit', compact('product'));
+			    }
+			 -------------------------------------------------------------------------------------------
+			【★★showViewの作成】
+			-------------------------------------------------------------------------------------------
+			resources
+			　　L　views
+			　　　　　L　products
+			　　　　　　　　　L　edit.blade.php    
+			    
+							    <div>
+								     <h2>Edit Product</h2>
+								 </div>
+								 <div>
+								     <a href="{{ route('products.index') }}"> Back</a>
+								 </div>
+								 
+								 <form action="{{ route('products.update',$product->id) }}" method="POST">
+								     @csrf
+								     @method('PUT')//【※更新の時はPUT※】
+								 
+								     <div>
+								         <strong>Name:</strong>
+								         <input type="text" name="name" value="{{ $product->name }}" placeholder="Name">
+								     </div>
+								     <div>
+								         <strong>Description:</strong>
+								         <textarea style="height:150px" name="description" placeholder="description">{{ 											$product->description }}</textarea>
+								     </div>
+								     <div>
+								         <strong>Price:</strong>
+								         <input type="number" name="price"  value="{{ $product->price }}">
+								     </div>
+								     <div>
+								         <button type="submit">Submit</button>
+								     </div>
+								 
+								 </form>
+								 
+				-------------------------------------------------------------------------------------------	
+				【★★updateアクション】
+				-------------------------------------------------------------------------------------------
+				public function update(Request $request, Product $product)
+			    {
+			        $product->name = $request->input('name');
+			         $product->description = $request->input('description');
+			         $product->price = $request->input('price');
+			         $product->update();
+			 
+			         return to_route('products.index');
+			    }
+				-------------------------------------------------------------------------------------------	
+
+				【★★deleteアクション★★】
+				-------------------------------------------------------------------------------------------	
+				public function destroy(Product $product)
+			    {
+			        $product->delete();
+			  
+			         return to_route('products.index');
+			    }
+			    -------------------------------------------------------------------------------------------	
+----------------------------------------
+◆5.5商品登録時にカテゴリを選択できるようにする
+----------------------------------------　
+-------------------------------------------------------------------------------------------	
+app
+　L　Http　
+　　　　L　Controllers
+　　　　　　　　L　ProductController.php
+-------------------------------------------------------------------------------------------	
+　　　　　　　　use App\Models\Category;　//Categoryモデルを使用できるよう宣言
+　　　　　　　　
+		【★★createアクションの変更】
+		public function create()
+	    {
+	         return view('products.create');
+	         $categories = Category::all();
+	  
+	         return view('products.create', compact('categories'));
+	    }
+　　　　-------------------------------------------------------------------------------------------	
+　　　　【★★create.blade.phpに追加★★】
+　　　　-------------------------------------------------------------------------------------------	
+　　　　resources
+　　　　　　　L　views\products
+　　　　　　　　　　　L　create.blade.php
+　　　　-------------------------------------------------------------------------------------------	
+　　　　<div>
+         <strong>Category:</strong>
+         <select name="category_id">
+         @foreach ($categories as $category)
+         <option value="{{ $category->id }}">{{ $category->name }}</option>
+         @endforeach
+         </select>
+    	 </div>
+　　　　-------------------------------------------------------------------------------------------	　　　
+◆app
+　L　Http
+　　　L　Controllers
+　　　　　　　L　ProductController.php
+　　　　　　　　storeアクションでcategory_idをデータベースに保存できるようにします　　　　　　　　
+			-------------------------------------------------------------------------------------------	
+			【★★storeアクション★★】
+			-------------------------------------------------------------------------------------------	
+			public function store(Request $request)
+		    {
+		        $product = new Product();
+		        $product->name = $request->input('name');
+		        $product->description = $request->input('description');
+		        $product->price = $request->input('price');
+		         $product->category_id = $request->input('category_id');
+		        $product->save();
+
+		        return to_route('products.index');
+		    }
+		    -------------------------------------------------------------------------------------------	
+			-------------------------------------------------------------------------------------------	
+			【★★editアクション変更★★】
+			-------------------------------------------------------------------------------------------	
+			public function edit(Product $product)
+		    {
+		        $categories = Category::all();
+		  
+		         return view('products.edit', compact('product', 'categories'));
+		    }
+			-------------------------------------------------------------------------------------------	
+			【★★editビュー変更★★】
+			-------------------------------------------------------------------------------------------	
+			resources
+			　　L　views
+			　　　　　L　products
+			　　　　　　　　L　edit.blade.php
+			-------------------------------------------------------------------------------------------	
+			<div>
+		         <strong>Category:</strong>
+		         <select name="category_id">
+		         @foreach ($categories as $category)
+		             @if ($category->id == $product->category_id)
+		                 <option value="{{ $category->id }}" selected>{{ $category->name }}</option>
+		             @else
+		                 <option value="{{ $category->id }}">{{ $category->name }}</option>
+		             @endif
+		         @endforeach
+		         </select>
+		     </div>
+			-------------------------------------------------------------------------------------------	
+			
+			-------------------------------------------------------------------------------------------	
+			【★★updateアクションでCategory_idを保存できるようにする★★】
+			-------------------------------------------------------------------------------------------	
+			app
+			　L　Http
+			　　　　L　Controllers
+			　　　　　　　　　L　ProductController.php
+			-------------------------------------------------------------------------------------------	
+			【productContoroller.php】
+			【★★updateアクション★★｝
+			-------------------------------------------------------------------------------------------	
+			public function update(Request $request, Product $product)
+		    {
+		        $product->name = $request->input('name');
+		         $product->description = $request->input('description');
+		         $product->price = $request->input('price');
+		         $product->category_id = $request->input('category_id');
+		         $product->update();
+		 
+		         return to_route('products.index');
+		    }
+			-------------------------------------------------------------------------------------------	
+			
+			
+
+----------------------------------------
+●6.1ログイン機能を追加する。
+----------------------------------------　
+※Laravel UIパッケージをインストール
+【コマンド】
+composer require laravel/ui
+
+【コマンド】
+bootstrapを指定してScaffolding（骨組み）を作成
+php artisan ui bootstrap --auth
+
+上記実行するとWarningがでるのでnpmnpm install && npm run devを実行する
+【コマンド】
+・npm install 
+
+・npm run dev
+※それぞれ別々にインストールする。
+
+---------------------------------------------
+◆上記コマンドを実行するとweb.phpに下記表示が出力されている
+---------------------------------------------
+routes
+　　L　web.php
+---------------------------------------------
+Auth::routes();
+
+Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+-------------------------------------------------------------------------------------------	
+-------------------------------------------
+6.2 ログイン関連画面のデザインを調整しよう
+-------------------------------------------
+◆ログイン画面のデザイン調整
+
+resources
+　　　L　views
+　　　　　　L　auth
+　　　　　　　　L　login.blade.php
+　　　　　　　　
+　　　　　　　　 
+ --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------	-------------------------------------------------------------------------------------------	-------------------------------------------------------------------------------------------	
+				 @extends('layouts.app')<!--★★@extends('layouts.app')　resources\views\layoutsディレクトリ内のapp.blade.phpを使用する事を示している-->
+				 @section('content')
+				 <div class="container"><!--resources\views\layouts\app.blade.php内の@yeild部分に差し込まれる-->
+				     <div class="row justify-content-center">
+				         <div class="col-md-5">
+				             <h3 class="mt-3 mb-3">ログイン</h3>
+				 
+				             <hr>
+				             <form method="POST" action="{{ route('login') }}">
+				                 @csrf
+				 
+				                 <div class="form-group">
+				                     <input id="email" type="email" class="form-control @error('email') is-invalid @enderror samuraimart-login-input" name="email" value="{{ old('email') }}" required autocomplete="email" autofocus placeholder="メールアドレス">
+				 
+				                     @error('email')
+				                     <span class="invalid-feedback" role="alert">
+				                         <strong>メールアドレスが正しくない可能性があります。</strong>
+				                     </span>
+				                     @enderror
+				                 </div>
+				 
+				                 <div class="form-group">
+				                     <input id="password" type="password" class="form-control @error('password') is-invalid @enderror samuraimart-login-input" name="password" required autocomplete="current-password" placeholder="パスワード">
+				 
+				                     @error('password')
+				                     <span class="invalid-feedback" role="alert">
+				                         <strong>パスワードが正しくない可能性があります。</strong>
+				                     </span>
+				                     @enderror
+				                 </div>
+				 
+				                 <div class="form-group">
+				                     <div class="form-check">
+				                         <input class="form-check-input" type="checkbox" name="remember" id="remember" {{ old('remember') ? 'checked' : '' }}>
+				 
+				                         <label class="form-check-label samuraimart-check-label w-100" for="remember">
+				                             次回から自動的にログインする
+				                         </label>
+				                     </div>
+				                 </div>
+				 
+				                 <div class="form-group">
+				                     <button type="submit" class="mt-3 btn samuraimart-submit-button w-100">
+				                         ログイン
+				                     </button>
+				 
+				                     <a class="btn btn-link mt-3 d-flex justify-content-center samuraimart-login-text" href="{{ route('password.request') }}">
+				                         パスワードをお忘れの場合
+				                     </a>
+				                 </div>
+				             </form>
+				 
+				             <hr>
+				 
+				             <div class="form-group">
+				                 <a class="btn btn-link mt-3 d-flex justify-content-center samuraimart-login-text" href="{{ route('register') }}">
+				                     新規登録
+				                 </a>
+				             </div>
+				         </div>
+				     </div>
+				 </div>
+				 @endsection
+-------------------------------------------------------------------------------------------	-------------------------------------------------------------------------------------------	-------------------------------------------------------------------------------------------	-------------------------------------------------------------------------------------------	
+
+-------------------------------------------
+6.3 スタイルシートを作成
+-------------------------------------------
+public
+  L css
+     L samuraimart.css
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------		
+		.samuraimart-login-input {
+     border-radius: 2px;
+     border: solid 1px #b2b2b2;
+     background-color: #ffffff;
+ }
+ 
+ .samuraimart-check-label {
+     font-family: YuGo;
+     font-size: 12px;
+     font-weight: 500;
+     font-stretch: normal;
+     font-style: normal;
+     line-height: normal;
+     letter-spacing: normal;
+     color: #000000;
+ }
+ 
+ .samuraimart-require-input-label {
+     border-radius: 1px;
+     background-color: #e2001b;
+ }
+ 
+ .samuraimart-require-input-label-text {
+     font-family: YuGo;
+     font-size: 14px;
+     font-weight: 500;
+     font-stretch: normal;
+     font-style: normal;
+     line-height: normal;
+     letter-spacing: normal;
+     color: #ffffff;
+ }
+ 
+ .samuraimart-submit-button {
+     font-family: YuGo;
+     font-size: 14px;
+     font-weight: bold;
+     font-stretch: normal;
+     font-style: normal;
+     line-height: normal;
+     letter-spacing: normal;
+     color: #ffffff;
+     background-color: #0fbe9f;
+ }
+ 
+ .samuraimart-login-text {
+     font-family: YuGo;
+     font-size: 14px;
+     font-weight: bold;
+     font-stretch: normal;
+     font-style: normal;
+     line-height: normal;
+     letter-spacing: normal;
+     color: #0fbe9f;
+ }
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+resources
+    L views
+        L layouts
+             L app.blade.phpに先ほど作成した
+             ※public\css\samuraimart.cssを読み込むコードを追加します。
+　　　　　　【◆追加する】
+			<link href="{{ asset('css/samuraimart.css') }}" rel="stylesheet">
+			※asset()関数を使用することで、publicディレクトリ配下のファイルにアクセスできる
 
 
 
+			
+-------------------------------------------
+6.4　パスワード再設定画面のデザイン調整
+-------------------------------------------
+resources
+　　　　L　views
+　　　　　　　L　auth
+　　　　　　　　　　L　passwords
+　　　　　　　　　　　　　L　email.blade.php　【●ここパスワード再設定画面が実装されている】
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+							 @extends('layouts.app')
+							 
+							 @section('content')
+							 <div class="container">
+							     <div class="row justify-content-center">
+							         <div class="col-md-5">
+							             <h3 class="mt-3 mb-3">パスワード再設定</h3>
+							 
+							             <p>
+							                 ご登録時のメールアドレスを入力してください。<br>
+							                 パスワード再発行用のメールをお送りします。  
+							             </p>
+							 
+							             <hr>
+							 
+							             @if (session('status'))
+							             <div class="alert alert-success" role="alert">
+							                 {{ session('status') }}
+							             </div>
+							             @endif
+							 
+							 
+							             <form method="POST" action="{{ route('password.email') }}">
+							                 @csrf
+							 
+							                 <div class="form-group">
+							                     <input id="email" type="email" class="form-control @error('email') is-invalid @enderror samuraimart-login-input" name="email" value="{{ old('email') }}" required autocomplete="email" autofocus placeholder="メールアドレス">
+							 
+							                     @error('email')
+							                     <span class="invalid-feedback" role="alert">
+							                         <strong>メールアドレスが正しくない可能性があります。</strong>
+							                     </span>
+							                     @enderror
+							                 </div>
+							 
+							                 <div class="form-group">
+							                     <button type="submit" class="btn samuraimart-submit-button w-100">
+							                         送信
+							                     </button>
+							                 </div>
+							             </form>
+							         </div>
+							     </div>
+							 </div>
+							 @endsection
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+-------------------------------------------
+6.5　新規アカウント作成画面のデザイン調整
+-------------------------------------------
+【アカウント画面】
+resources
+　　　L　views
+　　　　　　　L　auth
+　　　　　　　　　L　register.blade.php
+-------------------------------------------　　　　　　　　　
 
+		@extends('layouts.app')
+		 
+		 @section('content')
+		 <div class="container">
+		     <div class="row justify-content-center">
+		         <div class="col-md-5">
+		             <h3 class="mt-3 mb-3">新規会員登録</h3>
+		 
+		             <hr>
+		 
+		             <form method="POST" action="{{ route('register') }}">
+		                 @csrf
+		 
+		                 <div class="form-group row">
+		                     <label for="name" class="col-md-5 col-form-label text-md-left">氏名<span class="ml-1 samuraimart-require-input-label"><span class="samuraimart-require-input-label-text">必須</span></span></label>
+		 
+		                     <div class="col-md-7">
+		                         <input id="name" type="text" class="form-control @error('name') is-invalid @enderror samuraimart-login-input" name="name" value="{{ old('name') }}" required autocomplete="name" autofocus placeholder="侍 太郎">
+		 
+		                         @error('name')
+		                         <span class="invalid-feedback" role="alert">
+		                             <strong>氏名を入力してください</strong>
+		                         </span>
+		                         @enderror
+		                     </div>
+		                 </div>
+		 
+		                 <div class="form-group row">
+		                     <label for="email" class="col-md-5 col-form-label text-md-left">メールアドレス<span class="ml-1 samuraimart-require-input-label"><span class="samuraimart-require-input-label-text">必須</span></span></label>
+		 
+		                     <div class="col-md-7">
+		                         <input id="email" type="email" class="form-control @error('email') is-invalid @enderror samuraimart-login-input" name="email" value="{{ old('email') }}" required autocomplete="email" placeholder="samurai@samurai.com">
+		 
+		                         @error('email')
+		                         <span class="invalid-feedback" role="alert">
+		                             <strong>メールアドレスを入力してください</strong>
+		                         </span>
+		                         @enderror
+		                     </div>
+		                 </div>
+		 
+		                 <div class="form-group row">
+		                     <label for="postal_code" class="col-md-5 col-form-label text-md-left">郵便番号<span class="ml-1 samuraimart-require-input-label"><span class="samuraimart-require-input-label-text">必須</span></span></label>
+		 
+		                     <div class="col-md-7">
+		                         <input type="text" class="form-control @error('postal_code') is-invalid @enderror samuraimart-login-input" name="postal_code" required placeholder="150-0043">
+		                     </div>
+		                 </div>
+		 
+		                 <div class="form-group row">
+		                     <label for="address" class="col-md-5 col-form-label text-md-left">住所<span class="ml-1 samuraimart-require-input-label"><span class="samuraimart-require-input-label-text">必須</span></span></label>
+		 
+		                     <div class="col-md-7">
+		                         <input type="text" class="form-control @error('address') is-invalid @enderror samuraimart-login-input" name="address" required placeholder="東京都渋谷区道玄坂２丁目１１−１">
+		                     </div>
+		                 </div>
+		 
+		                 <div class="form-group row">
+		                     <label for="phone" class="col-md-5 col-form-label text-md-left">電話番号<span class="ml-1 samuraimart-require-input-label"><span class="samuraimart-require-input-label-text">必須</span></span></label>
+		 
+		                     <div class="col-md-7">
+		                         <input type="text" class="form-control @error('phone') is-invalid @enderror samuraimart-login-input" name="phone" required placeholder="03-5790-9039">
+		                     </div>
+		                 </div>
+		 
+		                 <div class="form-group row">
+		                     <label for="password" class="col-md-5 col-form-label text-md-left">パスワード<span class="ml-1 samuraimart-require-input-label"><span class="samuraimart-require-input-label-text">必須</span></span></label>
+		 
+		                     <div class="col-md-7">
+		                         <input id="password" type="password" class="form-control @error('password') is-invalid @enderror samuraimart-login-input" name="password" required autocomplete="new-password">
+		 
+		                         @error('password')
+		                         <span class="invalid-feedback" role="alert">
+		                             <strong>{{ $message }}</strong>
+		                         </span>
+		                         @enderror
+		                     </div>
+		                 </div>
+		 
+		                 <div class="form-group row">
+		                     <label for="password-confirm" class="col-md-5 col-form-label text-md-left"></label>
+		 
+		                     <div class="col-md-7">
+		                         <input id="password-confirm" type="password" class="form-control samuraimart-login-input" name="password_confirmation" required autocomplete="new-password">
+		                     </div>
+		                 </div>
+		 
+		                 <div class="form-group">
+		                     <button type="submit" class="btn samuraimart-submit-button w-100">
+		                         アカウント作成
+		                     </button>
+		                 </div>
+		             </form>
+		         </div>
+		     </div>
+		 </div>
+		 @endsection
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
