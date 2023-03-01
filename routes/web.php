@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReviewController;
+use App\Models\Product;
+
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -24,3 +26,5 @@ Route::resource('products', ProductController::class)->middleware(['auth', 'veri
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
 Route::post('reviews', [ReviewController::class, 'store'])->name('reviews.store');
+
+Route::get('products/{product}/favorite', [ProductController::class, 'favorite'])->name('products.favorite');
