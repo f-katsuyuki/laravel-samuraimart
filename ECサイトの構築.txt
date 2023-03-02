@@ -2100,6 +2100,245 @@ public
 
 
 
+----------------------------------------------------------
+●13章 ページネーションを追加しよう
+----------------------------------------------------------
+※コンテンツの多い時に複数のページに分割する機能
+例）商品数が多い時等、ページ番号部分がページネーション
+ページ番号のリンク
+-------------------------------------------------------------
+◆13.1 コントローラを修正しよう
+-------------------------------------------------------------
+app
+ L Http
+     L Controllers
+             L ProductController.php
+--------------------------------------------------------------
+$products = Product::paginate(15);//ページを15ページまで作成
+
+---------------------------------------------------------------
+●13.2 ビューを修正しよう
+---------------------------------------------------------------
+resources
+　　　L　views
+　　　　　　L　products
+　　　　　　　　　L　index.blade.php
+---------------------------------------------------------------
+ {{ $products->links() }}
+
+------------------------------------------------------------------
+●13.3 サービスプロバイダを修正しよう
+-------------------------------------------------------------------
+app
+　L　Providers
+　　　　　　L　AppServiceProvider.php
+--------------------------------------------------------------------
+
+ use Illuminate\Pagination\Paginator;
+
+	public function boot()
+    {
+        Paginator::useBootstrap();
+    }
+
+--------------------------------------------------------------------
+●14章 カテゴリでの絞り込み機能を追加しよう
+--------------------------------------------------------------------
+◆コントローラーを修正しよう
+app
+　L　Http
+　　　L　Controllers
+　　　　　　　L　ProductController.php
+----------------------------------------------------------------------
+		$categories = Category::all();
+        $major_category_names = Category::pluck('major_category_name')->unique();
+		return view('products.index', compact('products', 'categories', 'major_category_names'));
+----------------------------------------------------------------------
+※Category::pluck('major_category_name')->unique();は、全カテゴリーのデータからmajor_category_nameの
+※カラムのみを取得します。その上でunique()を使い、重複している部分を削除しています。
+
+--------------------------------------------------------------------------
+◆ビューを修正しよう　カテゴリの一覧を左に出力する処理
+--------------------------------------------------------------------------
+resources
+　　L views
+　　　　L　components
+　　　　　　　L　sidebar.blade.php//ファイル作成
+--------------------------------------------------------------------------
+<div class="container">
+     @foreach ($major_category_names as $major_category_name)
+         <h2>{{ $major_category_name }}</h2>
+         @foreach ($categories as $category)
+             @if ($category->major_category_name === $major_category_name)
+                 <label class="samuraimart-sidebar-category-label"><a href="#">{{ $category->name }}</a></label>
+             @endif
+         @endforeach
+     @endforeach
+ </div>
+--------------------------------------------------------------------------
+※カテゴリーの大分類（$major_category_names）をforeach文でループ処理して表示します。
+さらに、大分類に属するカテゴリーをforeach文でループ処理します。そうすることで、
+大分類ごとに各カテゴリーを並べて表示することができます。
+--------------------------------------------------------------------------
+
+--------------------------------------------------------------------------
+◆サイドバーをコンポーネントとして呼び出す処理
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　products
+　　　　　　　　　L　index.blade.php
+--------------------------------------------------------------------------
+	<div class="col-2">
+         @component('components.sidebar', ['categories' => $categories, 'major_category_names' => $major_category_names])
+         @endcomponent
+     </div> 
+--------------------------------------------------------------------------
+
+--------------------------------------------------------------------------
+◆サイドバーのCSSを追加
+--------------------------------------------------------------------------
+public
+　　L　css
+　　　　L　samuraimart.css
+--------------------------------------------------------------------------
+	.samuraimart-sidebar-category-label {
+     width: 156px;
+     height: 20px;
+     font-family: YuGo;
+     font-size: 13px;
+     font-weight: 500;
+     font-stretch: normal;
+     font-style: normal;
+     line-height: normal;
+     letter-spacing: normal;
+     color: #191919;
+ }
+--------------------------------------------------------------------------
+
+--------------------------------------------------------------------------
+◆14.2 カテゴリーで絞り込もう
+--------------------------------------------------------------------------
+◆コントローラーの修正
+app
+　L Http
+　　　L　Controllers
+　　　　　　　L　ProductController.php
+--------------------------------------------------------------------------
+public function index(Request $request)
+    {
+        //$products=Product::all();
+        if ($request->category !== null) {
+            $products = Product::where('category_id', $request->category)->paginate(15);
+            $total_count = Product::where('category_id', $request->category)->count();
+            $category = Category::find($request->category);
+        } else {
+            $products = Product::paginate(15);
+            $total_count = "";
+            $category = null;
+        }
+        $categories = Category::all();
+        $major_category_names = Category::pluck('major_category_name')->unique();
+
+         //return view('products.index', compact('products'));
+         return view('products.index', compact('products', 'category', 'categories', 'major_category_names', 'total_count'));
+        }
+    
+    // 後略
+    
+    }
+
+
+--------------------------------------------------------------------------
+※$products = Product::where('category_id', $request->category)->paginate(15);を実行して、
+受け取った絞り込みたいカテゴリーのIDを持つ商品データを取得しています。
+またpaginate(15)も実行しているので、ページネーションにも対応しています。
+
+
+--------------------------------------------------------------------------
+◆14.3 ビューの修正
+--------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　components
+　　　　　　　　L　sidebar.blade.php
+--------------------------------------------------------------------------
+<label class="samuraimart-sidebar-category-label"><a href="{{ route('products.index', ['category' => $category->id]) }}">{{ $category->name }}</a></label>
+--------------------------------------------------------------------------
+※{{ route('products.index', ['category' => $category->id]) }}のように、
+呼び出すルーティングの後に連想配列で変数を渡すことで、コントローラー側へ値を渡すことができます
+
+
+--------------------------------------------------------------------------
+◆どういうカテゴリの商品が表示されているかをわかるようにする
+--------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　products
+　　　　　　　　　L　index.blade.php
+--------------------------------------------------------------------------
+
+         <div class="container">
+             @if ($category !== null)
+                 <a href="{{ route('products.index') }}">トップ</a> > <a href="#">{{ $category->major_category_name }}</a> > {{ $category->name }}
+                 <h1>{{ $category->name }}の商品一覧{{$total_count}}件</h1>
+             @endif
+         </div>
+
+
+
+			{{ $products->appends(request()->query())->links() }}
+--------------------------------------------------------------------------
+
+※<h1>{{ $category->name }}の商品一覧{{$total_count}}件</h1>を追加して、絞り込んでいる
+カテゴリー名を表示しています。また$total_countでは、カテゴリーで絞り込んだ商品の数を表示しています。
+
+※また、カテゴリーで絞り込んだ条件を保持してページングするために、
+{{ $products->appends(request()->query())->links() }}に変更しています。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
