@@ -2299,47 +2299,421 @@ resources
 
 
 
+--------------------------------------------------------------------------
+◆15. ソート機能の追加
+--------------------------------------------------------------------------
+
+【ライブラリのインストール】
+　　　kyslik
+【コマンド】
+composer require kyslik/column-sortable
 
 
 
+--------------------------------------------------------------------------
+◆15.1 モデルの修正
+--------------------------------------------------------------------------
+app
+　L　Models
+　　　　L　Product.php
+--------------------------------------------------------------------------
+【Kyslikを使用できるよう宣言】
+use Kyslik\ColumnSortable\Sortable;
+
+use HasFactory, Favoriteable, Sortable;
 
 
+--------------------------------------------------------------------------
+◆15.2 コントローラーの修正
+--------------------------------------------------------------------------
+app
+　LHttp
+　　L　Controllers
+　　　　　　L　ProductController.php
+--------------------------------------------------------------------------
+//sortable()を使用することでソートが可能となる。
+ $products = Product::where('category_id', $request->category)->sortable()->paginate(15);
 
 
+--------------------------------------------------------------------------
+◆15.3 ビューの修正
+--------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　products
+　　　　　　　　　L　index.blade.php
+--------------------------------------------------------------------------
+		<div>
+             Sort By
+             @sortablelink('id', 'ID')
+             @sortablelink('price', 'Price')
+         </div>
+--------------------------------------------------------------------------
+※@sortablelinkはソートするためのリンクを追加する関数です。第1引数にソートするカラム名、
+第2引数にビューに表示する文字列を指定します。
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
 
 
+--------------------------------------------------------------------------
+◆16. ユーザー情報を編集できるようにする
+--------------------------------------------------------------------------
+
+---------------------------------------------------------------------------
+●16.1 Userモデルにカラムを追加しよう
+---------------------------------------------------------------------------
+【コマンド】
+php artisan make:migration add_columns_to_users
+---------------------------------------------------------------------------
+database
+　　L　migrations
+　　　　　　L　XXXX_XX_XX_XXXXXX_add_columns_to_users.php
+---------------------------------------------------------------------------
+			$table->string('postal_code')->default('');
+             $table->text('address');
+             $table->string('phone')->default('');
+---------------------------------------------------------------------------
+
+【コマンド】※実行して反映
+php artisan migrate
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+★新規アカウントの作成時に、同様に住所などを保存できるようにします
+---------------------------------------------------------------------------
+app
+　L Http
+　　　L　Controllers
+　　　　　　　　L　Auth
+　　　　　　　　　　L　RegisterController.php
+---------------------------------------------------------------------------
+	protected function validator(array $data)
+    {
+            'postal_code' => ['required', 'string'],
+             'address' => ['required', 'string'],
+             'phone' => ['required', 'string'],
+			----------------------------------------
+
+ protected function create(array $data)
+    {
+
+	         'postal_code' => $data['postal_code'],
+             'address' => $data['address'],
+             'phone' => $data['phone'],
+			----------------------------------------
+---------------------------------------------------------------------------
 
 
+--------------------------------------------------------------------------
+◆16.2 アカウント作成時に住所等を保存できるようにする
+--------------------------------------------------------------------------
+app
+　L Models
+　　　L　User.php
+--------------------------------------------------------------------------　　　
+     	'name',
+        'email',
+        'password',
+        'postal_code',
+        'address',
+        'phone'
+
+--------------------------------------------------------------------------　
+◆16.3 コントローラーを作成しよう
+--------------------------------------------------------------------------　
+【コマンド】
+php artisan make:controller UserController --model=User
+
+app
+　L　Http
+　　　L　Controllers
+　　　　　　　L　UserController.php
+--------------------------------------------------------------------------　　　　　　
+　　※※※index、create、store、show、destroyを削除する
+--------------------------------------------------------------------------
+
+※今回は、ユーザーのマイページとユーザー情報を編集するページの作成、そして編集
+ページからデータを受け取り、データベースに保存されている値を更新する処理が必要
+になります。そのため、indexアクションなどの不要なアクションを削除しています。
+--------------------------------------------------------------------------
+use Illuminate\Support\Facades\Auth;
+
+	public function mypage()//マイページ関数を作成
+     {
+         $user = Auth::user();
+ 
+         return view('users.mypage', compact('user'));
+     }
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+◆次にeditアクションを修正
+--------------------------------------------------------------------------
+public function edit(User $user)
+    {
+         //
+         $user = Auth::user();
+ 
+         return view('users.edit', compact('user'));
+    }
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+◆次にupdateアクションを修正
+--------------------------------------------------------------------------
+	public function update(Request $request, User $user)
+    {
+         //
+         $user = Auth::user();
+ 
+         $user->name = $request->input('name') ? $request->input('name') : $user->name;
+         $user->email = $request->input('email') ? $request->input('email') : $user->email;
+         $user->postal_code = $request->input('postal_code') ? $request->input('postal_code') : $user->postal_code;
+         $user->address = $request->input('address') ? $request->input('address') : $user->address;
+         $user->phone = $request->input('phone') ? $request->input('phone') : $user->phone;
+         $user->update();
+ 
+         return to_route('mypage');
+    }
+
+※三項演算子は？が真である場合左　偽である場合右
 
 
+--------------------------------------------------------------------------　
+◆16.4 ルーティングを追加しよう
+--------------------------------------------------------------------------　
+routes
+　L　web.php
+--------------------------------------------------------------------------　
+ use App\Http\Controllers\UserController;
+
+Route::controller(UserController::class)->group(function () {
+     Route::get('users/mypage', 'mypage')->name('mypage');
+     Route::get('users/mypage/edit', 'edit')->name('mypage.edit');
+     Route::put('users/mypage', 'update')->name('mypage.update');
+ });
+
+--------------------------------------------------------------------------
 
 
+--------------------------------------------------------------------------　
+16.5 ビューを作成しよう
+--------------------------------------------------------------------------　
+resources
+　　L　views
+　　　　　L　users
+　　　　　　　　L　mypage.blade.php
+--------------------------------------------------------------------------
+@extends('layouts.app')
+ 
+ @section('content')
+ <div class="container d-flex justify-content-center mt-3">
+     <div class="w-50">
+         <h1>マイページ</h1>
+ 
+         <hr>
+ 
+         <div class="container">
+             <div class="d-flex justify-content-between">
+                 <div class="row">
+                     <div class="col-2 d-flex align-items-center">
+                         <i class="fas fa-user fa-3x"></i>
+                     </div>
+                     <div class="col-9 d-flex align-items-center ms-2 mt-3">
+                         <div class="d-flex flex-column">
+                             <label for="user-name">会員情報の編集</label>
+                             <p>アカウント情報の編集</p>
+                         </div>
+                     </div>
+                 </div>
+                 <div class="d-flex align-items-center">
+                     <a href="{{route('mypage.edit')}}">
+                         <i class="fas fa-chevron-right fa-2x"></i>
+                     </a>
+                 </div>
+             </div>
+         </div>
+ 
+         <hr>
+ 
+         <div class="container">
+             <div class="d-flex justify-content-between">
+                 <div class="row">
+                     <div class="col-2 d-flex align-items-center">
+                         <i class="fas fa-archive fa-3x"></i>
+                     </div>
+                     <div class="col-9 d-flex align-items-center ms-2 mt-3">
+                         <div class="d-flex flex-column">
+                             <label for="user-name">注文履歴</label>
+                             <p>注文履歴を確認できます</p>
+                         </div>
+                     </div>
+                 </div>
+                 <div class="d-flex align-items-center">
+                     <a href="{{route('mypage')}}">
+                         <i class="fas fa-chevron-right fa-2x"></i>
+                     </a>
+                 </div>
+             </div>
+         </div>
+ 
+         <hr>
+ 
+         <div class="container">
+             <div class="d-flex justify-content-between">
+                 <div class="row">
+                     <div class="col-2 d-flex align-items-center">
+                         <i class="fas fa-sign-out-alt fa-3x"></i>
+                     </div>
+                     <div class="col-9 d-flex align-items-center ms-2 mt-3">
+                         <div class="d-flex flex-column">
+                             <label for="user-name">ログアウト</label>
+                             <p>ログアウトします</p>
+                         </div>
+                     </div>
+                 </div>
+                 <div class="d-flex align-items-center">
+                     <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                         <i class="fas fa-chevron-right fa-2x"></i>
+                     </a>
+ 
+                     <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
+                         @csrf
+                     </form>
+                 </div>
+             </div>
+         </div>
+ 
+         <hr>
+     </div>
+ </div>
+ @endsection
 
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------
+◆次に、ユーザー情報の編集画面を作成します。
+--------------------------------------------------------------------------
+resources
+　　　L　views
+　　　　　　L　users
+　　　　　　　　L　edit.blade.php
+--------------------------------------------------------------------------
+@extends('layouts.app')
+ 
+ @section('content')
+ <div class="container">
+     <div class="row justify-content-center">
+         <div class="col-md-5">
+             <span>
+                 <a href="{{ route('mypage') }}">マイページ</a> > 会員情報の編集
+             </span>
+ 
+             <h1 class="mt-3 mb-3">会員情報の編集</h1>
+             <hr>
+ 
+             <form method="POST" action="{{ route('mypage') }}">
+                 @csrf
+                 <input type="hidden" name="_method" value="PUT">
+                 <div class="form-group">
+                     <div class="d-flex justify-content-between">
+                         <label for="name" class="text-md-left samuraimart-edit-user-info-label">氏名</label>
+                     </div>
+                     <div class="collapse show editUserName">
+                         <input id="name" type="text" class="form-control @error('name') is-invalid @enderror" name="name" value="{{ $user->name }}" required autocomplete="name" autofocus placeholder="侍 太郎">
+                         @error('name')
+                         <span class="invalid-feedback" role="alert">
+                             <strong>氏名を入力してください</strong>
+                         </span>
+                         @enderror
+                     </div>
+                 </div>
+                 <br>
+ 
+                 <div class="form-group">
+                     <div class="d-flex justify-content-between">
+                         <label for="email" class="text-md-left samuraimart-edit-user-info-label">メールアドレス</label>
+                     </div>
+                     <div class="collapse show editUserMail">
+                         <input id="email" type="text" class="form-control @error('email') is-invalid @enderror" name="email" value="{{ $user->email }}" required autocomplete="email" autofocus placeholder="samurai@samurai.com">
+                         @error('email')
+                         <span class="invalid-feedback" role="alert">
+                             <strong>メールアドレスを入力してください</strong>
+                         </span>
+                         @enderror
+                     </div>
+                 </div>
+                 <br>
+ 
+                 <div class="form-group">
+                     <div class="d-flex justify-content-between">
+                         <label for="postal_code" class="text-md-left samuraimart-edit-user-info-label">郵便番号</label>
+                     </div>
+                     <div class="collapse show editUserPhone">
+                         <input id="postal_code" type="text" class="form-control @error('postal_code') is-invalid @enderror" name="postal_code" value="{{ $user->postal_code }}" required autocomplete="postal_code" autofocus placeholder="XXX-XXXX">
+                         @error('postal_code')
+                         <span class="invalid-feedback" role="alert">
+                             <strong>郵便番号を入力してください</strong>
+                         </span>
+                         @enderror
+                     </div>
+                 </div>
+                 <br>
+ 
+                 <div class="form-group">
+                     <div class="d-flex justify-content-between">
+                         <label for="address" class="text-md-left samuraimart-edit-user-info-label">住所</label>
+                     </div>
+                     <div class="collapse show editUserPhone">
+                         <input id="address" type="text" class="form-control @error('address') is-invalid @enderror" name="address" value="{{ $user->address }}" required autocomplete="address" autofocus placeholder="東京都渋谷区道玄坂X-X-X">
+                         @error('address')
+                         <span class="invalid-feedback" role="alert">
+                             <strong>住所を入力してください</strong>
+                         </span>
+                         @enderror
+                     </div>
+                 </div>
+                 <br>
+ 
+                 <div class="form-group">
+                     <div class="d-flex justify-content-between">
+                         <label for="phone" class="text-md-left samuraimart-edit-user-info-label">電話番号</label>
+                     </div>
+                     <div class="collapse show editUserPhone">
+                         <input id="phone" type="text" class="form-control @error('phone') is-invalid @enderror" name="phone" value="{{ $user->phone }}" required autocomplete="phone" autofocus placeholder="XXX-XXXX-XXXX">
+                         @error('phone')
+                         <span class="invalid-feedback" role="alert">
+                             <strong>電話番号を入力してください</strong>
+                         </span>
+                         @enderror
+                     </div>
+                 </div>
+ 
+                 <hr>
+                 <button type="submit" class="btn samuraimart-submit-button mt-3 w-25">
+                     保存
+                 </button>
+             </form>
+         </div>
+     </div>
+ </div>
+ @endsection
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+--------------------------------------------------------------------------
+◆16.6 ヘッダーにマイページへのリンクを追加しよう
+--------------------------------------------------------------------------
 
+resources
+　　　L　views
+　　　　　　L　components
+　　　　　　　　　　L　header.blade.php
+--------------------------------------------------------------------------
 
+         <li class="nav-item mr-5">
+           <a class="nav-link" href="{{ route('mypage') }}">
+             <i class="fas fa-user mr-1"></i><label>マイページ</label>
+           </a>
+         </li>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+--------------------------------------------------------------------------
 
 
 

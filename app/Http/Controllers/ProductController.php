@@ -16,12 +16,13 @@ class ProductController extends Controller
     public function index(Request $request)
     {
          
-         if ($request->category !== null) {
-             $products = Product::where('category_id', $request->category)->paginate(15);
+        //$a=$request->category; 
+        if ($request->category !== null) {
+            $products = Product::where('category_id', $request->category)->sortable()->paginate(5);
              $total_count = Product::where('category_id', $request->category)->count();
              $category = Category::find($request->category);
          } else {
-             $products = Product::paginate(5);
+            $products = Product::where('category_id', $request->category)->sortable()->paginate(5);
              $total_count = "";
              $category = null;
          }
