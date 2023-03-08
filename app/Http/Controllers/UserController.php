@@ -5,10 +5,39 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-
+use App\Models\Product;
 class UserController extends Controller
 {
-    
+
+    public function favorite()
+     {
+         $user = Auth::user();
+ 
+         $favorites = $user->favorites(Product::class)->get();
+ 
+         return view('users.favorite', compact('favorites'));
+     }
+
+
+    public function update_password(Request $request)
+     {
+         $user = Auth::user();
+ 
+         if ($request->input('password') == $request->input('password_confirmation')) {
+             $user->password = bcrypt($request->input('password'));
+             $user->update();
+         } else {
+             return to_route('mypage.edit_password');
+         }
+ 
+         return to_route('mypage');
+     }
+
+     public function edit_password()
+     {
+         return view('users.edit_password');
+     }
+
     public function mypage()
      {
          $user = Auth::user();

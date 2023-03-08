@@ -2716,41 +2716,538 @@ resources
 --------------------------------------------------------------------------
 
 
+--------------------------------------------------------------------------
+◆17. パスワード変更機能を追加しよう
+--------------------------------------------------------------------------
+app
+　L　Http
+　　　L　Controllers
+　　　　　　　　L　UserController.php
+--------------------------------------------------------------------------
+◆コントローラーを修正
+--------------------------------------------------------------------------
+public function update_password(Request $request)
+     {
+         $user = Auth::user();
+ 
+         if ($request->input('password') == $request->input('password_confirmation')) {
+             $user->password = bcrypt($request->input('password'));
+             $user->update();
+         } else {
+             return to_route('mypage.edit_password');
+         }
+ 
+         return to_route('mypage');
+     }
+--------------------------------------------------------------------------
+
+◆パスワード変更画面を表示するedit_passwordアクションを作成します。
+--------------------------------------------------------------------------
+app
+　L　Http
+　　　　L　Controllers
+　　　　　　　　　L　UserController.php
+--------------------------------------------------------------------------
+	public function edit_password()
+     {
+         return view('users.edit_password');
+     }
+--------------------------------------------------------------------------
+
+--------------------------------------------------------------------------
+◆ルーティングの設定
+--------------------------------------------------------------------------
+routes
+　L　web.php
+--------------------------------------------------------------------------
+  	 Route::get('users/mypage/password/edit', 'edit_password')->name('mypage.edit_password');
+     Route::put('users/mypage/password', 'update_password')->name('mypage.update_password'); 
+--------------------------------------------------------------------------
+
+--------------------------------------------------------------------------
+◆ビューの作成
+--------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　users
+　　　　　　　　L　edit_password.blade.php
+--------------------------------------------------------------------------
+@extends('layouts.app')
+ 
+ @section('content')
+ <div class="container">
+     <form method="post" action="{{route('mypage.update_password')}}">
+         {{csrf_field()}}
+         <input type="hidden" name="_method" value="PUT">
+         <div class="form-group row mb-3">
+             <label for="password" class="col-md-3 col-form-label text-md-right">新しいパスワード</label>
+ 
+             <div class="col-md-7">
+                 <input id="password" type="password" class="form-control @error('password') is-invalid @enderror" name="password" required autocomplete="new-password">
+ 
+                 @error('password')
+                 <span class="invalid-feedback" role="alert">
+                     <strong>{{ $message }}</strong>
+                 </span>
+                 @enderror
+             </div>
+         </div>
+ 
+         <div class="form-group row mb-3">
+             <label for="password-confirm" class="col-md-3 col-form-label text-md-right">確認用</label>
+ 
+             <div class="col-md-7">
+                 <input id="password-confirm" type="password" class="form-control" name="password_confirmation" required autocomplete="new-password">
+             </div>
+         </div>
+ 
+         <div class="form-group d-flex justify-content-center">
+             <button type="submit" class="btn btn-danger w-25">
+                 パスワード更新
+             </button>
+         </div>
+     </form>
+ </div>
+ @endsection
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+◆マイページにパスワードのリセット画面へのリンクを追加しましょう。
+----------------------------------------------------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　users
+　　　　　　　　L　mypage.blade.php
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ 		<div class="container">
+             <div class="d-flex justify-content-between">
+                 <div class="row">
+                     <div class="col-2 d-flex align-items-center">
+                         <i class="fas fa-lock fa-3x"></i>
+                     </div>
+                     <div class="col-9 d-flex align-items-center ms-2 mt-3">
+                         <div class="d-flex flex-column">
+                             <label for="user-name">パスワード変更</label>
+                             <p>パスワードを変更します</p>
+                         </div>
+                     </div>
+                 </div>
+                 <div class="d-flex align-items-center">
+                     <a href="{{ route('mypage.edit_password') }}">
+                         <i class="fas fa-chevron-right fa-2x"></i>
+                     </a>
+                 </div>
+             </div>
+         </div>
+ 
+         <hr>
+----------------------------------------------------------------------------------------------------------------------------------------------------
 
 
+--------------------------------------------------------------------------
+◆18. お気に入りした商品を表示する
+--------------------------------------------------------------------------
+◆コントローラーの修正
+
+app
+　L　Http
+　　　L　Controllers
+　　　　　　　L　UserController.php
+--------------------------------------------------------------------------
+	public function favorite()
+     {
+         $user = Auth::user();
+ 
+         $favorites = $user->favorites(Product::class)->get();
+ 
+         return view('users.favorite', compact('favorites'));
+     }
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+◆18.2 ルーティングを追加しよう
+--------------------------------------------------------------------------
+route
+　L　web.php
+--------------------------------------------------------------------------
+　 Route::get('users/mypage/favorite', 'favorite')->name('mypage.favorite');
+--------------------------------------------------------------------------
+
+--------------------------------------------------------------------------
+◆18.3 ビューを作成しよう
+--------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　users
+　　　　　　　　L　favorite.blade.php
+--------------------------------------------------------------------------
+@extends('layouts.app')
+ 
+ @section('content')
+ <div class="container  d-flex justify-content-center mt-3">
+     <div class="w-75">
+         <h1>お気に入り</h1>
+ 
+         <hr>
+ 
+         <div class="row">
+             @foreach ($favorites as $fav)
+             <div class="col-md-7 mt-2">
+                 <div class="d-inline-flex">
+                     <a href="{{route('products.show', $fav->favoriteable_id)}}" class="w-25">
+                         <img src="{{ asset('img/dummy.png')}}" class="img-fluid w-100">
+                     </a>
+                     <div class="container mt-3">
+                         <h5 class="w-100 samuraimart-favorite-item-text">{{App\Models\Product::find($fav->favoriteable_id)->name}}</h5>
+                         <h6 class="w-100 samuraimart-favorite-item-text">&yen;{{App\Models\Product::find($fav->favoriteable_id)->price}}</h6>
+                     </div>
+                 </div>
+             </div>
+             <div class="col-md-2 d-flex align-items-center justify-content-end">
+                 <a href="{{ route('products.favorite', $fav->favoriteable_id) }}" class="samuraimart-favorite-item-delete">
+                     削除
+                 </a>
+             </div>
+             <div class="col-md-3 d-flex align-items-center justify-content-end">
+                 <button type="submit" class="btn samuraimart-favorite-add-cart">カートに入れる</button>
+             </div>
+             @endforeach
+         </div>
+ 
+         <hr>
+     </div>
+ </div>
+ @endsection
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+◆CSSを追加
+--------------------------------------------------------------------------
+public
+　L　css
+　　　L　samuraimart.css
+--------------------------------------------------------------------------
+ .samuraimart-favorite-add-cart {
+     border-radius: 2px;
+     color: #ffffff;
+     background-color: #0fbe9f;
+ }
+--------------------------------------------------------------------------
+
+◆ヘッダーにお気に入りページへのリンクを追加します。
+--------------------------------------------------------------------------
+resouces
+　　L　views
+　　　　　L　components
+　　　　　　　　　L　header.blade.php
+--------------------------------------------------------------------------
+        <li class="nav-item mr-5">
+           <a class="nav-link" href="{{ route('mypage.favorite') }}">
+             <i class="far fa-heart"></i>
+           </a>
+         </li>
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+◆19章 ショッピングカート機能を追加しよう
+--------------------------------------------------------------------------
+◆ライブラリのインストール
+--------------------------------------------------------------------------
+【コマンド】
+composer require bumbummen99/shoppingcart
+--------------------------------------------------------------------------
+◆shoppingcartライブラリの設定ファイルをコピーします。
+【コマンド】
+php artisan vendor:publish --provider="Gloudemans\Shoppingcart\ShoppingcartServiceProvider" --tag="config"
+--------------------------------------------------------------------------
+config
+　　L　cart.php
+--------------------------------------------------------------------------
+◆maigrationもコピーする
+--------------------------------------------------------------------------
+【コマンド】
+php artisan vendor:publish --provider="Gloudemans\Shoppingcart\ShoppingcartServiceProvider" --tag="migrations"
+--------------------------------------------------------------------------
+database
+　　L　migrations
+　　　　　L　2018_12_23_120000_create_shoppingcart_table.php
+--------------------------------------------------------------------------
+$table->integer('number')->nullable();
+--------------------------------------------------------------------------
+【マイグレーションを実行して反映】
+【コマンド】
+php artisan migrate
+
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+◆19.2 コントローラーを作成しよう
+--------------------------------------------------------------------------
+【コマンド】
+php artisan make:controller CartController --resource
+--------------------------------------------------------------------------
+app
+　L Http
+　　　L　Controllers
+　　　　　　　　L　CartController.php
+--------------------------------------------------------------------------
+◆不要なアクション（create・show・edit・updateアクション）を削除します。
+
+--------------------------------------------------------------------------
+◆19.3 コントローラー　indexアクションを修正
+--------------------------------------------------------------------------
+app
+　L　Http
+　　　L　Controllers
+　　　　　　　　L　CartController.php
+--------------------------------------------------------------------------
+ use Gloudemans\Shoppingcart\Facades\Cart;
+ use Illuminate\Support\Facades\Auth;
+	public function index()
+    {
+		$cart = Cart::instance(Auth::user()->id)->content();
+ 
+         $total = 0;
+ 
+         foreach ($cart as $c) {
+             $total += $c->qty * $c->price;
+         }
+ 
+         return view('carts.index', compact('cart', 'total'));
+	｝
+--------------------------------------------------------------------------
+★　$cart = Cart::instance(Auth::user()->id)->content();
+ユーザーのIDを元にこれまで追加したカートの中身を$cart変数に保存します。
+--------------------------------------------------------------------------
+
+---------------------------------------------------------------------------
+◆storeアクションの追加
+---------------------------------------------------------------------------
+
+  public function store(Request $request)
+    {
+         //
+         Cart::instance(Auth::user()->id)->add(
+             [
+                 'id' => $request->id, 
+                 'name' => $request->name, 
+                 'qty' => $request->qty, 
+                 'price' => $request->price, 
+                 'weight' => $request->weight, 
+             ] 
+         );
+ 
+         return to_route('products.show', $request->get('id'));
+    }
+
+---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+◆destroyアクションの追加
+---------------------------------------------------------------------------
+★購入済みかどうかを判定する為のカラムをshoppingcartに追加
+---------------------------------------------------------------------------
+【コマンド】
+php artisan make:migration add_buy_flag_to_shoppingcart
+---------------------------------------------------------------------------
+database
+　　L　migrations
+　　　　　　L　XXXX_XX_XX_XXXXXX_add_buy_flag_to_shoppingcart.php
+---------------------------------------------------------------------------
+	public function up()
+    {
+        Schema::table('shoppingcart', function (Blueprint $table) {
+             //
+             $table->boolean('buy_flag')->default(false);
+        });
+    }
+
+---------------------------------------------------------------------------
+【マイグレーションを行う】
+【コマンド】
+php artisan migrate
+---------------------------------------------------------------------------
+
+---------------------------------------------------------------------------
+◆destrOyアクションの追加
+---------------------------------------------------------------------------
+app
+ L
+  Http
+    L Controllers
+            L CartController.php
+---------------------------------------------------------------------------
+
+ use Illuminate\Support\Facades\DB;
+public function destroy(Request $request)
+     {
+         //
+         $user_shoppingcarts = DB::table('shoppingcart')->where('instance', Auth::user()->id)->get();
+         $count = $user_shoppingcarts->count();
+ 
+         $count += 1;
+         Cart::instance(Auth::user()->id)->store($count);
+ 
+         DB::table('shoppingcart')->where('instance', Auth::user()->id)->where('number', null)->update(['number' => $count, 'buy_flag' => true]);
+ 		//---------------------------------------------------------------------------
+ 		//【●】↑【●】DB::table('shoppingcart')では、データベース内のshoppingcartテーブルへのアクセスを行っています。その後where()を使って
+ 		//ユーザーのIDとカート数$countを使い、先ほど作成したカートのデータを更新しています。
+        //---------------------------------------------------------------------------
+         Cart::instance(Auth::user()->id)->destroy();//ユーザーのIDを使ってカート内の商品情報などをデータベースへと保存しています。
+ 
+         return to_route('carts.index');
+    }
+---------------------------------------------------------------------------
+★$count = $user_shoppingcarts->count();では、現在までのユーザーが注文したカートの数を取得しています。
+
+★$count += 1;では、新しくデータベースに登録するカートのデータ用にカートのIDを一つ増やしています。
+---------------------------------------------------------------------------
+
+---------------------------------------------------------------------------
+◆ショッピングカートの中身を確認できるようにする
+---------------------------------------------------------------------------
+◆ビューを追加
+---------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　carts
+　　　　　　　　L　index.blade.php
+---------------------------------------------------------------------------
 
 
+@section('content')
+ <div class="container d-flex justify-content-center mt-3">
+     <div class="w-75">
+         <h1>ショッピングカート</h1>
+ 
+         <div class="row">
+             <div class="offset-8 col-4">
+                 <div class="row">
+                     <div class="col-6">
+                         <h2>数量</h2>
+                     </div>
+                     <div class="col-6">
+                         <h2>合計</h2>
+                     </div>
+                 </div>
+             </div>
+         </div>
+ 
+         <hr>
+ 
+         <div class="row">
+             @foreach ($cart as $product)
+             <div class="col-md-2 mt-2">
+                 <a href="{{route('products.show', $product->id)}}">
+                     <img src="{{ asset('img/dummy.png')}}" class="img-fluid w-100">
+                 </a>
+             </div>
+             <div class="col-md-6 mt-4">
+                 <h3 class="mt-4">{{$product->name}}</h3>
+             </div>
+             <div class="col-md-2">
+                 <h3 class="w-100 mt-4">{{$product->qty}}</h3>
+             </div>
+             <div class="col-md-2">
+                 <h3 class="w-100 mt-4">￥{{$product->qty * $product->price}}</h3>
+             </div>
+             @endforeach
+         </div>
+ 
+         <hr>
+ 
+         <div class="offset-8 col-4">
+             <div class="row">
+                 <div class="col-6">
+                     <h2>合計</h2>
+                 </div>
+                 <div class="col-6">
+                     <h2>￥{{$total}}</h2>
+                 </div>
+                 <div class="col-12 d-flex justify-content-end">
+                     表示価格は税込みです
+                 </div>
+             </div>
+         </div>
+     </div>
+ </div>
+ @endsection
+------------------------------------------------------------------------------------------------------------------------------------------------------
 
+---------------------------------------------------------------------------------------------------------
+◆ルーティングの追加
+---------------------------------------------------------------------------------------------------------
+routes
+　　L web.php
+---------------------------------------------------------------------------------------------------------
+use App\Http\Controllers\CartController;
 
+Route::controller(CartController::class)->group(function () {
+     Route::get('users/carts', 'index')->name('carts.index');
+ });
+---------------------------------------------------------------------------------------------------------
+※Route::get('users/carts', 'index')->name('carts.index');を追加し、
+カートの中身を確認するページへのURLを設定し、CartControllerでグルーピングしています。
+---------------------------------------------------------------------------------------------------------
 
+---------------------------------------------------------------------------------------------------------
+◆20.2　カートに商品を追加
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　products
+　　　　　　　　L　show.blade.php
+---------------------------------------------------------------------------------------------------------
+<form method="POST" action="{{route('carts.store')}}" class="m-3 align-items-end">
 
+---------------------------------------------------------------------------------------------------------
+◆お気に入り画面から商品を追加できるようにしましょう。
+---------------------------------------------------------------------------------------------------------
+resources
+　　　L　views
+　　　　　　L　users
+　　　　　　　　L　favorite.blade.php
+---------------------------------------------------------------------------------------------------------
+                <form method="POST" action="{{route('carts.store')}}" class="m-3 align-items-end">
+                     @csrf
+                     <input type="hidden" name="id" value="{{App\Models\Product::find($fav->favoriteable_id)->id}}">
+                     <input type="hidden" name="name" value="{{App\Models\Product::find($fav->favoriteable_id)->name}}">
+                     <input type="hidden" name="price" value="{{App\Models\Product::find($fav->favoriteable_id)->price}}">
+                     <input type="hidden" name="qty" value="1">
+                     <input type="hidden" name="weight" value="0">
+                     <button type="submit" class="btn samuraimart-favorite-add-cart">カートに入れる</button>
+                 </form>
+---------------------------------------------------------------------------------------------------------
 
+---------------------------------------------------------------------------------------------------------
+◆ルーティングの設定
+---------------------------------------------------------------------------------------------------------
+routes
+　　L　web.php
+---------------------------------------------------------------------------------------------------------
+Route::post('users/carts', 'store')->name('carts.store');
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆20.3 ヘッダーにカートへのリンクを追加しよう
+---------------------------------------------------------------------------------------------------------
+resources
+　　　L　views
+　　　　　　L　components
+　　　　　　　　　　L　header.blade.php
+---------------------------------------------------------------------------------------------------------
+        <li class="nav-item mr-5">
+           <a class="nav-link" href="{{ route('carts.index') }}">
+             <i class="fas fa-shopping-cart"></i>
+           </a>
+         </li>
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆20.4 購入できるようにしよう
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　L carts
+　　　　　　L　index.blade.php
+---------------------------------------------------------------------------------------------------------
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+---------------------------------------------------------------------------------------------------------
+◆21.1 コントローラーを作成しよう
+---------------------------------------------------------------------------------------------------------
 
 
 
