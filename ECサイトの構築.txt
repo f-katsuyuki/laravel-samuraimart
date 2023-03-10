@@ -3248,6 +3248,404 @@ resources
 ---------------------------------------------------------------------------------------------------------
 ◆21.1 コントローラーを作成しよう
 ---------------------------------------------------------------------------------------------------------
+◆【コマンド】
+php artisan make:controller WebController
+---------------------------------------------------------------------------------------------------------
+
+app
+　L　Http
+　　　L　Controllers
+　　　　　　　L　WebController.php
+　　　　　　　
+---------------------------------------------------------------------------------------------------------
+use App\Models\Category;
+
+public function index()
+    {
+        $categories = Category::all()->sortBy('major_category_name');
+
+        $major_category_names = Category::pluck('major_category_name')->unique();
+
+        return view('web.index', compact('major_category_names', 'categories'));
+    }
+---------------------------------------------------------------------------------------------------------
+
+◆ルーティングの設定
+---------------------------------------------------------------------------------------------------------
+routes
+　L　web.php
+---------------------------------------------------------------------------------------------------------
+ use App\Http\Controllers\WebController;
+ 
+  Route::get('/',  [WebController::class, 'index']);
+---------------------------------------------------------------------------------------------------------
+◆ビューの作成
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　L　web
+　　　　　　L　index.blade.php
+---------------------------------------------------------------------------------------------------------
+ @extends('layouts.app')
+ 
+ @section('content')
+ <div class="row">
+     <div class="col-2">
+         @component('components.sidebar', ['categories' => $categories, 'major_category_names' => $major_category_names])
+         @endcomponent
+     </div>
+     <div class="col-9">
+         <h1>おすすめ商品</h1>
+         <div class="row">
+             <div class="col-4">
+                 <a href="#">
+                     <img src="{{ asset('img/chestnut.jpg') }}" class="img-thumbnail">
+                 </a>
+                 <div class="row">
+                     <div class="col-12">
+                         <p class="samuraimart-product-label mt-2">
+                             和栗の詰め合わせ<br>
+                             <label>￥2000</label>
+                         </p>
+                     </div>
+                 </div>
+             </div>
+             <div class="col-4">
+                 <a href="#">
+                     <img src="{{ asset('img/persimmon.jpg') }}" class="img-thumbnail">
+                 </a>
+                 <div class="row">
+                     <div class="col-12">
+                         <p class="samuraimart-product-label mt-2">
+                             おいしい柿<br>
+                             <label>￥500</label>
+                         </p>
+                     </div>
+                 </div>
+             </div>
+ 
+             <div class="col-4">
+                 <a href="#">
+                     <img src="{{ asset('img/orange.jpg') }}" class="img-thumbnail">
+                 </a>
+                 <div class="row">
+                     <div class="col-12">
+                         <p class="samuraimart-product-label mt-2">
+                             旬なみかん<br>
+                             <label>￥1200</label>
+                         </p>
+                     </div>
+                 </div>
+             </div>
+ 
+         </div>
+ 
+         <h1>新着商品</h1>
+         <div class="row">
+             <div class="col-3">
+                 <a href="#">
+                     <img src="{{ asset('img/robot-vacuum-cleaner.jpg') }}" class="img-thumbnail">
+                 </a>
+                 <div class="row">
+                     <div class="col-12">
+                         <p class="samuraimart-product-label mt-2">
+                             ロボット掃除機<br>
+                             <label>￥55000</label>
+                         </p>
+                     </div>
+                 </div>
+             </div>
+ 
+             <div class="col-3">
+                 <a href="#">
+                     <img src="{{ asset('img/sofa.jpg') }}" class="img-thumbnail">
+                 </a>
+                 <div class="row">
+                     <div class="col-12">
+                         <p class="samuraimart-product-label mt-2">
+                             3人掛けソファー<br>
+                             <label>￥35000</label>
+                         </p>
+                     </div>
+                 </div>
+             </div>
+ 
+             <div class="col-3">
+                 <a href="#">
+                     <img src="{{ asset('img/cup.jpg') }}" class="img-thumbnail">
+                 </a>
+                 <div class="row">
+                     <div class="col-12">
+                         <p class="samuraimart-product-label mt-2">
+                             コーヒーカップ<br>
+                             <label>￥1000</labiel>
+                         </p>
+                     </div>
+                 </div>
+             </div>
+ 
+             <div class="col-3">
+                 <a href="#">
+                     <img src="{{ asset('img/cutlery.jpg') }}" class="img-thumbnail">
+                 </a>
+                 <div class="row">
+                     <div class="col-12">
+                         <p class="samuraimart-product-label mt-2">
+                             食器 カトラリーセット1組<br>
+                             <label>￥2000</label>
+                         </p>
+                     </div>
+                 </div>
+             </div>
+         </div>
+     </div>
+ </div>
+ @endsection
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+●22.1 レビューに評価機能を追加
+---------------------------------------------------------------------------------------------------------
+◆1.1 テーブルにカラムを追加しよう
+---------------------------------------------------------------------------------------------------------
+
+【コマンド】
+php artisan make:migration add_score_to_reviews
+
+database
+　　L　migrations
+　　　　　　L XXXX_XX_XX_XXXXXXXX_add_score_to_reviews.php
+---------------------------------------------------------------------------------------------------------
+	public function up()
+    {
+        Schema::table('reviews', function (Blueprint $table) {
+        $table->integer('score')->unsigned()->default(0);
+        });
+    }
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan migrate
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆コントローラーを修正しよう
+---------------------------------------------------------------------------------------------------------
+app
+　L Http
+　　　L　Controllers
+　　　　　　　L　ReviewController.php
+---------------------------------------------------------------------------------------------------------
+public function store(Request $request)
+    {
+         //
+         $request->validate([
+             'content' => 'required'
+         ]);
+ 
+         $review = new Review();
+         $review->content = $request->input('content');
+         $review->product_id = $request->input('product_id');
+         $review->user_id = Auth::user()->id;
+         $review->score = $request->input('score');//★　※※※　ここを追加　※※※
+         $review->save();
+ 
+         return back();
+    }
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆1.2 ビューを修正しよう
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L products
+　　　　　　　　L　show.blade.php
+---------------------------------------------------------------------------------------------------------
+						<h3 class="review-score-color">{{ str_repeat('★', $review->score) }}</h3>
+
+                         
+                         
+                         <h4>評価</h4>
+                         <select name="score" class="form-control m-2 review-score-color">
+                             <option value="5" class="review-score-color">★★★★★</option>
+                             <option value="4" class="review-score-color">★★★★</option>
+                             <option value="3" class="review-score-color">★★★</option>
+                             <option value="2" class="review-score-color">★★</option>
+                             <option value="1" class="review-score-color">★</option>
+                         </select>
+※レビューを作成するformタグの中にselectタグを追加して、評価を選べるようにしています。
+※また、選んだ評価（★の数）を、数値としてコントローラに送信します。
+
+---------------------------------------------------------------------------------------------------------
+◆1.3 CSSを修正しよう
+---------------------------------------------------------------------------------------------------------
+public
+　　L　css
+　　　　L　samuraimart.css
+---------------------------------------------------------------------------------------------------------
+.review-score-color {
+    color: #0fbe9f;
+}
+
+.review-score-color:focus {
+    color: #0fbe9f;
+}
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+◆2章 購入時の確認画面を実装しよう
+---------------------------------------------------------------------------------------------------------
+◆2.1 購入時の確認画面を実装しよう
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　carts
+　　　　　　　　L　index.blade.php
+---------------------------------------------------------------------------------------------------------
+<div class="btn samuraimart-submit-button" data-bs-toggle="modal" data-bs-target="#buy-confirm-modal">購入を確定する</div>
+
+<div class="btn samuraimart-submit-button disabled" data-bs-toggle="modal" data-bs-target="#buy-confirm-modal">購入を確定する</div>
+
+             <div class="modal fade" id="buy-confirm-modal" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog" aria-labelledby="staticBackdropLabel" aria-hidden="true">
+                 <div class="modal-dialog">
+                     <div class="modal-content">
+                         <div class="modal-header">
+                             <h5 class="modal-title" id="staticBackdropLabel">購入を確定しますか？</h5>
+                             <button type="button" class="close" data-bs-dismiss="modal" aria-label="閉じる">
+                                 <span aria-hidden="true">&times;</span>
+                             </button>
+                         </div>
+                         <div class="modal-footer">
+                             <button type="button" class="btn samuraimart-favorite-button border-dark text-dark" data-bs-dismiss="modal">閉じる</button>
+                             <button type="submit" class="btn samuraimart-submit-button">購入</button>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+---------------------------------------------------------------------------------------------------------
+※モーダルウィンドウを使用することに加え、画面に表示するモーダルウィンドウのIDを指定しています。
+※モーダルウィンドウとは、元の画面の上に表示される別画面でしたね。ユーザーが商品を購入するかキャンセルするまで元の画面に戻ることはできません。
+
+※ここで指定されたIDを持つHTML要素を、モーダルウィンドウとして呼び出すことができます。
+※また、以下は呼び出されるモーダルウィンドウのコードです。
+
+
+
+
+---------------------------------------------------------------------------------------------------------
+◆3章 管理画面を実装しよう #1
+---------------------------------------------------------------------------------------------------------
+3.1 ライブラリを導入しよう
+【コマンド】
+composer require encore/laravel-admin
+
+※Configディレクトリやlangディレクトリ等をコピー
+【コマンド】
+php artisan vendor:publish --provider="Encore\Admin\AdminServiceProvider"
+
+※インストールを完了する
+【コマンド】
+php artisan admin:install
+---------------------------------------------------------------------------------------------------------
+※※※初期ID・パスワード　
+ID:admin 
+pw:admin
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+3.2 カテゴリーの管理画面を作成しよう
+---------------------------------------------------------------------------------------------------------
+※CRUDの作成
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan admin:make CategoryController --model="App\Models\Category"
+---------------------------------------------------------------------------------------------------------
+app
+　
+　L Admin
+　　　L　routes.php
+---------------------------------------------------------------------------------------------------------
+◆ルーティングの設定　これは管理画面用
+---------------------------------------------------------------------------------------------------------
+use Illuminate\Routing\Router;
+ use App\Admin\Controllers\CategoryController;
+
+Admin::routes();
+
+Route::group([
+    'prefix'        => config('admin.route.prefix'),
+    'namespace'     => config('admin.route.namespace'),
+    'middleware'    => config('admin.route.middleware'),
+    'as'            => config('admin.route.prefix') . '.',
+], function (Router $router) {
+
+    $router->get('/', 'HomeController@index')->name('home');
+     $router->resource('categories', CategoryController::class);
+
+});
+---------------------------------------------------------------------------------------------------------
+※左のmenuボタンをクリックして、タイトル：カテゴリー　URL：categories
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+◆ソートできるようにしよう
+---------------------------------------------------------------------------------------------------------
+◆app
+　L　Admin
+　　　　L　Controllers
+　　　　　　　　L　CategoryController.php
+---------------------------------------------------------------------------------------------------------
+	$grid->column('id', __('Id'))->sortable();
+	$grid->column('created_at', __('Created at'))->sortable();
+    $grid->column('updated_at', __('Updated at'))->sortable();
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+◆フィルタ機能を拡張しよう
+---------------------------------------------------------------------------------------------------------
+app
+　L　Admin
+　　　　L　Controllers
+　　　　　　　　　L　CategoryController.php
+---------------------------------------------------------------------------------------------------------
+		$grid->filter(function($filter) {
+        $filter->like('name', 'カテゴリー名');
+        $filter->like('major_category_name', '親カテゴリー名');
+        $filter->between('created_at', '登録日')->datetime();
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+●4章 管理画面を実装しよう #2
+---------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
