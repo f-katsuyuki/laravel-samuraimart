@@ -72,5 +72,10 @@ return [
     'links' => [
         public_path('storage') => storage_path('app/public'),
     ],
-
+    'admin' => [
+        'driver' =>'local',
+        'root' => public_path(''),
+        'visibility' =>'public',
+        'url' => env('APP_URL'),
+    ],
 ];

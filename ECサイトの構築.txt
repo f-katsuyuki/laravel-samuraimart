@@ -3612,58 +3612,622 @@ app
 ---------------------------------------------------------------------------------------------------------
 
 ---------------------------------------------------------------------------------------------------------
-●4章 管理画面を実装しよう #2
+●4章 商品画像用のカラムを追加しよう #2
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan make:migration add_image_to_products
+---------------------------------------------------------------------------------------------------------
+database
+　　L migrations
+　　　　　L　XXXX_XX_XX_XXXXXX_add_image_to_products.php
+---------------------------------------------------------------------------------------------------------
+public function up()
+    {
+        Schema::table('products', function (Blueprint $table) {
+        $table->string('image')->default('');
+        });
+    }
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan migrate
+
+
+---------------------------------------------------------------------------------------------------------
+●4章.2 画像をアップデートできるようにする
+---------------------------------------------------------------------------------------------------------
+◆【intervuention/imageをインストール】
+【コマンド】
+
+composer require intervention/image
+
+public
+　L　img　【画像保存場所】
+---------------------------------------------------------------------------------------------------------
+config
+　L　admin.php
+---------------------------------------------------------------------------------------------------------
+	'directory' => [
+            'image' => 'img',
+            'file'  => 'files',
+        ],
 ---------------------------------------------------------------------------------------------------------
 
+config
+　L　filesystems.php
+【アプリ内のストレージに画像ファイルを作成できるように】
+ 'admin' => [
+             'driver' =>'local',
+             'root' => public_path(''),
+             'visibility' =>'public',
+             'url' => env('APP_URL'),
+         ],
+---------------------------------------------------------------------------------------------------------
+
+◆.envファイルのAPP_URLの個所を以下のように変更
+
+◆ APP_URL=http://localhost/laravel-samuraimart/public
+
+---------------------------------------------------------------------------------------------------------
+
+◆商品の管理画面を作成
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan admin:make ProductController --model="App\Models\Product"
+---------------------------------------------------------------------------------------------------------
+app
+　L　Admin
+　　　　L　Controllers
+　　　　　　　　　L　ProductController.php
+---------------------------------------------------------------------------------------------------------
+
+ use App\Models\Category;
+ 
+protected function grid()
+    {
+        $grid = new Grid(new Product());
+
+        $grid->column('id', __('Id'));
+        $grid->column('name', __('Name'));
+        $grid->column('description', __('Description'));
+        $grid->column('price', __('Price'));
+         
+         $grid->column('category.name', __('Category Name'));
+         $grid->column('image', __('Image'))->image();
+        $grid->column('created_at', __('Created at'));
+        $grid->column('updated_at', __('Updated at'));
+         
+
+        return $grid;
+    }
+
+protected function detail($id)
+    {
+        $show = new Show(Product::findOrFail($id));
+
+        $show->field('id', __('Id'));
+        $show->field('name', __('Name'));
+        $show->field('description', __('Description'));
+        $show->field('price', __('Price'));
+        
+        $show->field('created_at', __('Created at'));
+        $show->field('updated_at', __('Updated at'));
+        $show->field('category.name', __('Category Name'));
+        $show->field('image', __('Image'))->image();
+
+        return $show;
+    }
+
+
+
+protected function form()
+    {
+        $form = new Form(new Product());
+
+        $form->text('name', __('Name'));
+        $form->textarea('description', __('Description'));
+        $form->number('price', __('Price'));
+        
+        $form->image('image', __('Image'));
+        $form->select('category_id', __('Category Name'))->options(Category::all()->pluck('name', 'id'));
+        return $form;
+    }
+
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+
+$show->field('category.name', __('Category Name'));とすることで、表示画面ではカテゴリーIDではなく、
+カテゴリー名を表示するようにしています。
+$form->select('category_id', __('Category Name'))->options(Category::all()->pluck('name', 'id'));の部分は、
+存在するカテゴリー名から選択できるようにしています。
+
+また、$grid->column('image', __('Image'))->image();や$show->field('image', __('Image'))->image();とするこ
+とによって、CRUD画面で商品画像の設定や表示ができるようになります。
+
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+◆ルーティングの設定
+---------------------------------------------------------------------------------------------------------
+app
+　L　Admin
+　　　　L　routes.php
+---------------------------------------------------------------------------------------------------------
+ <?php
+
+use Illuminate\Routing\Router;
+use App\Admin\Controllers\CategoryController;
+use App\Admin\Controllers\ProductController;
+Admin::routes();
+
+Route::group([
+    'prefix'        => config('admin.route.prefix'),
+    'namespace'     => config('admin.route.namespace'),
+    'middleware'    => config('admin.route.middleware'),
+    'as'            => config('admin.route.prefix') . '.',
+], function (Router $router) {
+
+    $router->get('/', 'HomeController@index')->name('home');
+    $router->resource('categories', CategoryController::class);
+    $router->resource('products', ProductController::class);
+});
+
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+◆ソートとフィルタを追加
+---------------------------------------------------------------------------------------------------------
+app
+　L　Admin
+　　　　L　Controllers
+　　　　　　　　L　ProductController.php
+---------------------------------------------------------------------------------------------------------
+protected function detail($id)
+    {
+        $show = new Show(Product::findOrFail($id));
+
+        $grid->column('id', __('Id'))->sortable();
+        $show->field('name', __('Name'));
+        $show->field('description', __('Description'));
+        $grid->column('price', __('Price'))->sortable();
+        
+        $grid->column('created_at', __('Created at'))->sortable();
+        
+        $show->field('category.name', __('Category Name'));
+        $show->field('image', __('Image'))->image();
+        $grid->column('updated_at', __('Updated at'))->sortable();
+ 
+        $grid->filter(function($filter) {
+        $filter->like('name', '商品名');
+        $filter->like('description', '商品説明');
+        $filter->between('price', '金額');
+        $filter->in('category_id', 'カテゴリー')->multipleSelect(Category::all()->pluck('name', 'id'));
+         });
+        return $show;
+    }
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+◆4.4 商品画像を表示しよう
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　products
+　　　　　　　　　L　index.blade.php
+---------------------------------------------------------------------------------------------------------
+ 						@if ($product->image !== "")
+                            <img src="{{ asset($product->image) }}" class="img-thumbnail">
+                         @else
+                            <img src="{{ asset('img/dummy.png')}}" class="img-thumbnail">
+                         @endif
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆商品詳細画面に画像を表示する
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　　L　products
+　　　　　　　　　　L　show.blade.php
+---------------------------------------------------------------------------------------------------------
+			@if ($product->image)
+             <img src="{{ asset($product->image) }}" class="w-100 img-fluid">
+             @else
+             <img src="{{ asset('img/dummy.png')}}" class="w-100 img-fluid">
+             @endif
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆お気に入りの画面でも画像が表示されるようにする
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　users
+　　　　　　　　L　favorite.blade.php
+---------------------------------------------------------------------------------------------------------
+                        @if (App\Models\Product::find($fav->favoriteable_id)->image !== "")
+                         <img src="{{ asset(App\Models\Product::find($fav->favoriteable_id)->image) }}" class="img-fluid w-100">
+                         @else
+                         <img src="{{ asset('img/dummy.png') }}" class="img-fluid w-100">
+                         @endif
+
+---------------------------------------------------------------------------------------------------------
+◆ショッピングカート画面で画像を表示
+---------------------------------------------------------------------------------------------------------
+resources
+　L　views
+　　　　L　products
+　　　　　　　L　show.blade.php
+---------------------------------------------------------------------------------------------------------
+<input type="hidden" name="image" value="{{$product->image}}">
+
+resources
+　　L　views
+　　　　　L　users
+　　　　　　　　L　favorite.blade.php
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆コントローラーの設定
+---------------------------------------------------------------------------------------------------------
+app
+　L　Http
+　　　L　Controllers
+　　　　　　　　L　CartController.php
+---------------------------------------------------------------------------------------------------------
+public function store(Request $request)
+    {
+        Cart::instance(Auth::user()->id)->add(
+            [
+                'id' => $request->id, 
+                'name' => $request->name, 
+                'qty' => $request->qty, 
+                'price' => $request->price, 
+                'weight' => $request->weight, 
+                'options' => [
+                'image' => $request->image,
+                ]
+            ] 
+        );
+
+        return to_route('products.show', $request->get('id'));
+    }
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆ビューの設定
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　carts
+　　　　　　　　L　index.blade.php
+---------------------------------------------------------------------------------------------------------
+                    @if ($product->options->image)
+                     <img src="{{ asset($product->options->image) }}" class="img-fluid w-100">
+                     @else
+                     <img src="{{ asset('img/dummy.png')}}" class="img-fluid w-100">
+                     @endif
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+◆管理画面の実装
+---------------------------------------------------------------------------------------------------------
+5.1 親カテゴリーのモデルを作成しよう
+
+【コマンド】
+php artisan make:model MajorCategory -m
+---------------------------------------------------------------------------------------------------------
+database
+　　L　migrations
+　　　　　　L　XXX_XX_XX_XXXXXX_create_major_categories_table.php
+---------------------------------------------------------------------------------------------------------
+public function up()
+    {
+        Schema::create('major_categories', function (Blueprint $table) {
+            $table->id();
+             $table->string('name');
+             $table->text('description');
+            $table->timestamps();
+        });
+    }
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan migrate
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆5.2 親カテゴリーとカテゴリーのリレーションを設定しよう
+---------------------------------------------------------------------------------------------------------
+app
+　L　Models
+　　　　L　MajorCategory.php
+---------------------------------------------------------------------------------------------------------
+    public function categories()
+     {
+         return $this->hasMany('App\Models\Category');
+     }
+---------------------------------------------------------------------------------------------------------
+
+◆親カテゴリとリレーションを設定
+
+app
+　L　Models
+　　　　L　Category.ph
+---------------------------------------------------------------------------------------------------------
+
+    public function major_category()
+     {
+         return $this->belongsTo('App\Models\MajorCategory');
+     }
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆カテゴリに親カテゴリのIDを保存する為のカラムを追加
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan make:migration add_major_category_to_categories
+
+
+database
+　L　migrations
+　　　　　LXXX_XX_XX_XXXXXX_add_major_category_to_categories.php
+---------------------------------------------------------------------------------------------------------
+public function up()
+    {
+        Schema::table('categories', function (Blueprint $table) {
+        $table->integer('major_category_id')->default(0);
+        });
+    }
+---------------------------------------------------------------------------------------------------------
+
+◆親カテゴリのシーダーを作成
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan make:seeder MajorCategoriesSeeder
+---------------------------------------------------------------------------------------------------------
+database
+　L　seeders
+　　　　　L　MajorCategoriesSeeder.php
+---------------------------------------------------------------------------------------------------------
+  $major_category_names = [
+             '本', 'コンピュータ', 'ディスプレイ'
+         ];
+ 
+         foreach ($major_category_names as $major_category_name) {
+             MajorCategory::create([
+                 'name' => $major_category_name,
+                 'description' => $major_category_name,
+             ]);
+         }
+---------------------------------------------------------------------------------------------------------
+
+◆親カテゴリのシーダーを実行
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan db:seed --class=MajorCategoriesSeeder
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+◆5.4 親カテゴリーの管理画面を作成しよう
+---------------------------------------------------------------------------------------------------------
+【コマンド】
+php artisan admin:make MajorCategoryController --model="App\Models\MajorCategory"
+---------------------------------------------------------------------------------------------------------
+app
+　L　Admin
+　　　　L　Controllers
+　　　　　　　　　L　MajorCategoryController.php
+---------------------------------------------------------------------------------------------------------
+protected function grid()
+    {
+        $grid = new Grid(new MajorCategory());
+        $grid->column('id', __('Id'))->sortable();
+        $grid->column('name', __('Name'));
+        $grid->column('description', __('Description'));
+         
+        $grid->column('created_at', __('Created at'))->sortable();
+        
+        $grid->column('updated_at', __('Updated at'))->sortable();
+ 
+        $grid->filter(function($filter) {
+        $filter->like('name', '親カテゴリー名');
+        $filter->like('description', '説明');
+        $filter->between('created_at', '登録日')->datetime();
+         });
+
+        return $grid;
+    }
+---------------------------------------------------------------------------------------------------------
+
+◆ソートとフィルタを追加
+---------------------------------------------------------------------------------------------------------
+app
+　L　Admin
+　　　L　routes.php
+---------------------------------------------------------------------------------------------------------
+use App\Admin\Controllers\MajorCategoryController;
+
+$router->resource('major-categories', MajorCategoryController::class);
+
+---------------------------------------------------------------------------------------------------------
+◆5.5 カテゴリーからカラムを削除しよう
+---------------------------------------------------------------------------------------------------------
+
+【コマンド】
+php artisan make:migration drop_column_categories_table --table=categories
+---------------------------------------------------------------------------------------------------------
+database
+　　L　migrations
+　　　　　　L　XXXX_XX_XX_XXXXXX_drop_column_categories_table.php
+---------------------------------------------------------------------------------------------------------
+$table->dropColumn('major_category_name');
+
+【コマンド】
+php artisan migrate
+
+
+---------------------------------------------------------------------------------------------------------
+◆5.6 カテゴリーの管理画面を変更しよう
+---------------------------------------------------------------------------------------------------------
+app
+　L　Admin
+　　　　L　Controllers
+　　　　　　　　　L　CategoryController.php
+---------------------------------------------------------------------------------------------------------
+use App\Models\MajorCategory;
+
+protected function grid()
+    {
+        $grid = new Grid(new Category());
+
+        $grid->column('id', __('Id'))->sortable();
+        $grid->column('name', __('Name'));
+        $grid->column('description', __('Description'));
+        $grid->column('major_category_id', __('Major category name'))->editable('select', MajorCategory::all()->pluck('name', 'id'));
+        $grid->column('created_at', __('Created at'))->sortable();
+        $grid->column('updated_at', __('Updated at'))->sortable();
+
+        $grid->filter(function($filter) {
+        $filter->like('name', 'カテゴリー名');
+        $filter->in('major_category_id', '親カテゴリー名')->multipleSelect(MajorCategory::all()->pluck('name', 'id'));
+        $filter->between('created_at', '登録日')->datetime();
+        });
+        return $grid;
+    }
+---------------------------------------------------------------------------------------------------------
+ protected function detail($id)
+    {
+        $show = new Show(Category::findOrFail($id));
+
+        $show->field('id', __('Id'));
+        $show->field('name', __('Name'));
+        $show->field('description', __('Description'));
+        $show->field('major_category.name', __('Major category name'));
+        $show->field('created_at', __('Created at'));
+        $show->field('updated_at', __('Updated at'));
+
+        return $show;
+    }
+
+    /**
+     * Make a form builder.
+     *
+     * @return Form
+     */
+    protected function form()
+    {
+        $form = new Form(new Category());
+
+        $form->text('name', __('Name'));
+        $form->textarea('description', __('Description'));
+        $form->select('major_category_id', __('Major Category Name'))->options(MajorCategory::all()->pluck('name', 'id'));
+
+        return $form;
+    }
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆5.7 トップページを変更しよう
+---------------------------------------------------------------------------------------------------------
+app　
+　L　Http
+　　　　L　Controllers
+　　　　　　　　　L　WebController.php
+---------------------------------------------------------------------------------------------------------
+<?php
+
+namespace App\Http\Controllers;
+use App\Models\MajorCategory;
+
+use Illuminate\Http\Request;
+use App\Models\Category;
+class WebController extends Controller
+{
+    public function index()
+    {
+        $categories = Category::all();
+
+        $major_categories = MajorCategory::all();
+
+        return view('web.index', compact('major_categories', 'categories'));
+    }
+}
+---------------------------------------------------------------------------------------------------------
+
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　L　web
+　　　　　　L　index.blade.php
+---------------------------------------------------------------------------------------------------------
+@component('components.sidebar', ['categories' => $categories, 'major_categories' => $major_categories])
+
+
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　components
+　　　　　　　　　　L　sidebar.blade.php
+---------------------------------------------------------------------------------------------------------
+<div class="container">
+    @foreach ($major_categories as $major_category)
+         <h2>{{ $major_category->name }}</h2>
+         @foreach ($categories as $category)
+         @if ($category->major_category_id === $major_category->id)
+                <label class="samuraimart-sidebar-category-label"><a href="{{ route('products.index', ['category' => $category->id]) }}">{{ $category->name }}</a></label>
+            
+             @endif
+         @endforeach
+     @endforeach
+ </div>
+---------------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------------
+◆5.8 商品一覧ページを変更しよう
+---------------------------------------------------------------------------------------------------------
+app
+　L　Http
+　　　L　Controllers
+　　　　　　　LProductController.php
+---------------------------------------------------------------------------------------------------------
+ use App\Models\MajorCategory;
+ 
+ public function index(Request $request)
+    {
+         
+        //$a=$request->category; 
+        if ($request->category !== null) {
+            $products = Product::where('category_id', $request->category)->sortable()->paginate(5);
+             $total_count = Product::where('category_id', $request->category)->count();
+             $category = Category::find($request->category);
+             $major_category = MajorCategory::find($category->major_category_id);
+         } else {
+            $products = Product::where('category_id', $request->category)->sortable()->paginate(5);
+             $total_count = "";
+             $category = null;
+             $major_category = null; 
+         }
+        $categories = Category::all();
+        $major_categories = MajorCategory::all();
+
+         
+        return view('products.index', compact('products', 'category', 'major_category', 'categories', 'major_categories', 'total_count'));
+    }
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+---------------------------------------------------------------------------------------------------------
+resources
+　　L　views
+　　　　　L　products
+　　　　　　　　　L　index.blade.php
+---------------------------------------------------------------------------------------------------------
+        @component('components.sidebar', ['categories' => $categories, 'major_categories' => $major_categories])
+        @endcomponent
+    </div>
+    <div class="col-9">
+        <div class="container">
+            @if ($category !== null)
+                 <a href="{{ route('products.index') }}">トップ</a> > <a href="#">{{ $category->major_category_name }}</a> > {{ $category->name }}
+                 <a href="{{ route('products.index') }}">トップ</a> > <a href="#">{{ $major_category->name }}</a> > {{ $category->name }}
+                <h1>{{ $category->name }}の商品一覧{{$total_count}}件</h1>
+            @endif
+        </div>
 
 
 

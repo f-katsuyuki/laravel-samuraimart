@@ -6,6 +6,7 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use App\Models\Category;
 use Illuminate\Support\Facades\Auth;
+use App\Models\MajorCategory;
 class ProductController extends Controller
 {
     /**
@@ -21,16 +22,18 @@ class ProductController extends Controller
             $products = Product::where('category_id', $request->category)->sortable()->paginate(5);
              $total_count = Product::where('category_id', $request->category)->count();
              $category = Category::find($request->category);
+             $major_category = MajorCategory::find($category->major_category_id);
          } else {
             $products = Product::where('category_id', $request->category)->sortable()->paginate(5);
              $total_count = "";
              $category = null;
+             $major_category = null; 
          }
         $categories = Category::all();
-        $major_category_names = Category::pluck('major_category_name')->unique();
+        $major_categories = MajorCategory::all();
 
          
-         return view('products.index', compact('products', 'category', 'categories', 'major_category_names', 'total_count'));
+        return view('products.index', compact('products', 'category', 'major_category', 'categories', 'major_categories', 'total_count'));
     }
     
     // 後略
